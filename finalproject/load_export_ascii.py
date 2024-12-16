@@ -8,6 +8,7 @@ Created on Wed Dec  11 12:28:06 2024
 
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 ### -------- INITIAL CONDITIONS -------------
@@ -39,7 +40,7 @@ LAT, LONG = np.meshgrid(x, y, indexing='ij') # this sets up a plotting grid
 nodes = n_long*n_lat
 
 ## ---- TIME STEP
-dt = 5 # year
+dt = 10 # year
 
 dx = dxy #meters 
 dy = dxy #meters 
@@ -77,27 +78,28 @@ print(sy)
 
 ### --------- PLOT INITIAL CONDITIONS -------------
 
-fig, ax = plt.subplots(1,1) # use this method
 elv_matrix_pre = elv_flat.reshape(LAT.shape) # z is currently a 1D, but we will reshape it into the 2D coordinate form - recognizing that we want it to follow the shape of X.
-c1 = ax.pcolormesh(LONG, LAT, elv_matrix_pre, cmap = 'viridis')
-fig.colorbar(c1)
-ax.set_xlabel('Distance (m)')
-ax.set_ylabel('Depth (m)')
-ax.set_title('Initial conditions')
+
+
+Z_x, Z_y = np. gradient (elv_matrix_pre, dxy, dxy)
+slope = np.sqrt (Z_x **2 + Z_y **2)
+slope_normalized = slope/(np.max(slope)) ##puts slope values between zero and 1 
+
 
 
 fig = plt.figure()
 ax = fig.add_subplot(111,projection = '3d')
-ax.plot_surface(LONG,LAT,elv_matrix_pre)
-ax.set_title('inital conditions')
-ax.set_xlabel('x')
-ax.set_zlabel('z')
-ax.set_ylabel('y')
+surf = ax.plot_surface((LONG-np.min(LONG)),(LAT-np.min(LAT)),elv_matrix_pre, facecolors=plt.cm.viridis(slope_normalized),  # Colormap based on slope
+                       rstride=1, cstride=1, cmap='viridis', linewidth=0, antialiased=True )
+ax.set_title('Current topography of North Fork Henson Creek')
+ax.set_xlabel('Distance (m)', labelpad=10)
+ax.set_zlabel('elevation(m)', labelpad=10)
+ax.set_ylabel('Distance (m)', labelpad=10)
+
+cbar = fig.colorbar(surf)
+cbar.set_label('Magnitude of normalized slope')
 
 ### ---------- A MATRIX AND RUNNING THE MODEL
-"""
-I did not do this part because my test dataset was much too big. Try to keep the number of x and y nodes to 100 - so if your study area is 1km x 1km, then you will want to use a 10m or 30m elevation dataset rather than lidar. If you are using lidar, your study area should be 100m x 100m (or similar).
-"""
 
 A = np.zeros ((n_lat*n_long, n_lat*n_long))
 
@@ -124,21 +126,12 @@ for i in range(n_lat):
             A[ik,(i-1)*n_long + k] = sx 
             A[ik, i*n_long +k + 1] = sy
             A[ik, i*n_long +k - 1] = sy
-##print(A)
-   
-### ----- RUN A QUCK CHANGE -----
-#elv_matrix += np.random.random((LAT.shape))*5 # 5 meter random additions
-
-
-
 
 
 ## Run Matrix 
-print(elv_flat)
-
 
 time = 0 
-totaltime = 10000 #years 
+totaltime = 1000 #years 
 
 
 A_m = np.ma.masked_invalid(A)  # Mask invalid (NaN or Inf) values in matrix A
@@ -153,36 +146,38 @@ while time<=totaltime:
     time += dt
 
 
-print(elv_flat)
 ## plots final conditions 
 
-fig, ax = plt.subplots(1,1) # use this method
 elv_matrix = elv_flat_m.reshape(LAT.shape) # z is currently a 1D, but we will reshape it into the 2D coordinate form - recognizing that we want it to follow the shape of X.
-c1 = ax.pcolormesh(LONG, LAT, elv_matrix, cmap = 'viridis')
-fig.colorbar(c1)
-ax.set_xlabel('Distance (m)')
-ax.set_ylabel('distance  (m)')
-ax.set_title('Final Consitions')
 
+
+Z_x, Z_y = np. gradient (elv_matrix, dxy, dxy)
+slope = np.sqrt (Z_x **2 + Z_y **2)
+slope_normalized = slope/(np.max(slope)) ##puts slope values between zero and 1 
+ 
 
 fig = plt.figure()
 ax = fig.add_subplot(111,projection = '3d')
-ax.plot_surface(LONG,LAT,elv_matrix)
-ax.set_title('Final Conditions')
-ax.set_xlabel('x')
-ax.set_zlabel('z')
-ax.set_ylabel('y')
+surf = ax.plot_surface((LONG-np.min(LONG)),(LAT-np.min(LAT)),elv_matrix, facecolors=plt.cm.viridis(slope_normalized),  # Colormap based on slope
+                       rstride=1, cstride=1, cmap='viridis', linewidth=0, antialiased=True )
+ax.set_title('Topography of North Fork Henson Creek with only diffusion for ' + str(totaltime) + 'yrs')
+ax.set_xlabel('Distance (m)', labelpad=10)
+ax.set_zlabel('Elevation (meters)', labelpad=10)
+ax.set_ylabel('Distance (m)', labelpad=10)
+
+cbar = fig.colorbar(surf)
+cbar.set_label('Magnitude of normalized slope')
 
 
 elv_diff = elv_matrix_pre-elv_matrix
 
 fig = plt.figure()
 ax1 = fig.add_subplot(111,projection = '3d')
-ax1.plot_surface(LONG,LAT,elv_diff)
+ax1.plot_surface((LONG-np.min(LONG)),(LAT-np.min(LAT)),elv_diff,cmap = "RdBu")
 ax1.set_title("Elevation Difference")
-ax1.set_xlabel('x')
-ax1.set_zlabel('z')
-ax1.set_ylabel('y')
+ax1.set_xlabel('Distance (m)', labelpad=10)
+ax1.set_zlabel('Elevation (meters)', labelpad=10)
+ax1.set_ylabel('Distance (m)', labelpad=10)
 
 ### ---- SAVE ASCII OUTPUT (this can be opened in qgis easily!) -----
 header = 'NCOLS %s \n' % n_long + 'NROWS %s \n' % n_lat + 'xllcorner %s \n' % xllcorner+ 'yllcorner %s \n' % yllcorner + 'cellsize %s \n' % dxy + 'NODATA_value -9999'
